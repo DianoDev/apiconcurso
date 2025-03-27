@@ -5,40 +5,47 @@ namespace App\Http\Api;
 use App\Http\Controllers\Controller;
 use App\Models\FotoPessoa;
 use App\Models\Pessoa;
+use App\Services\MinioService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ApiFotoPessoaController extends Controller
 {
+    protected $minioService;
+
+    public function __construct(MinioService $minioService)
+    {
+        $this->minioService = $minioService;
+    }
+
     public function store(Request $request, $pessoaId)
     {
         $request->validate([
-            'file' => 'required|image|mimes:jpeg,png,jpg,gif,pdf|max:2048',
+            'file' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         try {
             $pessoa = Pessoa::findOrFail($pessoaId);
-
             $file = $request->file('file');
-            $hash = Str::random(40);
-            $filename = $hash . '.' . $file->getClientOriginalExtension();
 
-            // Fazer upload para o MinIO
-            Storage::disk('s3')->put($filename, file_get_contents($file));
+            // Usar o MinioService para fazer upload
+            $result = $this->minioService->uploadFile($file, 'fotos');
 
             $foto = FotoPessoa::create([
                 'pes_id' => $pessoa->pes_id,
                 'fp_data' => now(),
-                'fp_bucket' => config('filesystems.disks.s3.bucket'),
-                'fp_hash' => $filename,
+                'fp_bucket' => $result['bucket'],
+                'fp_hash' => $result['hash'],
             ]);
+
+            // Gerar URL temporária para retornar no response
+            $temporaryUrl = $this->minioService->getTemporaryUrl($result['path'], 5);
 
             return response()->json([
                 'message' => 'Foto cadastrada com sucesso',
                 'foto' => [
                     'id' => $foto->fp_id,
-                    'url' => $foto->url
+                    'url' => $temporaryUrl
                 ]
             ], 201);
         } catch (\Exception $e) {
@@ -51,10 +58,13 @@ class ApiFotoPessoaController extends Controller
         try {
             $foto = FotoPessoa::findOrFail($id);
 
+            // Gerar URL temporária
+            $temporaryUrl = $this->minioService->getTemporaryUrl($foto->fp_hash, 5);
+
             return response()->json([
                 'id' => $foto->fp_id,
                 'data' => $foto->fp_data,
-                'url' => $foto->url
+                'url' => $temporaryUrl
             ]);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Erro ao recuperar foto: ' . $e->getMessage()], 500);
@@ -67,7 +77,7 @@ class ApiFotoPessoaController extends Controller
             $foto = FotoPessoa::findOrFail($id);
 
             // Excluir o arquivo do MinIO
-            Storage::disk('s3')->delete($foto->fp_hash);
+            $this->minioService->deleteFile($foto->fp_hash);
 
             // Excluir o registro do banco de dados
             $foto->delete();
@@ -84,10 +94,13 @@ class ApiFotoPessoaController extends Controller
             $pessoa = Pessoa::findOrFail($pessoaId);
 
             $fotos = $pessoa->fotos()->latest('fp_data')->get()->map(function ($foto) {
+                // Gerar URL temporária para cada foto
+                $temporaryUrl = $this->minioService->getTemporaryUrl($foto->fp_hash, 5);
+
                 return [
                     'id' => $foto->fp_id,
                     'data' => $foto->fp_data,
-                    'url' => $foto->url
+                    'url' => $temporaryUrl
                 ];
             });
 

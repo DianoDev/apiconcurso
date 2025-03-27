@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use App\Services\MinioService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class FotoPessoa extends Model
 {
@@ -32,9 +32,7 @@ class FotoPessoa extends Model
 
     public function getUrlAttribute(): string
     {
-        return Storage::disk('s3')->temporaryUrl(
-            $this->fp_hash,
-            now()->addMinutes(5)
-        );
+        $minioService = app(MinioService::class);
+        return $minioService->getTemporaryUrl($this->fp_hash, 5);
     }
 }
