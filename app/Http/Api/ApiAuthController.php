@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class ApiAuthController extends Controller
 {
@@ -62,50 +63,42 @@ class ApiAuthController extends Controller
             'token' => 'required|string',
         ]);
 
-        // Extrair o ID do usuário do token
-        $tokenParts = explode('|', $request->token);
+        try {
+            // Encontra o token no banco de dados
+            $personalAccessToken = PersonalAccessToken::findToken($request->token);
 
-        if (count($tokenParts) !== 2) {
-            return response()->json(['error' => 'Token inválido'], 401);
-        }
+            if (!$personalAccessToken) {
+                return response()->json(['error' => 'Token inválido ou expirado'], 401);
+            }
 
-        $tokenId = explode('_', $tokenParts[0]);
+            // Obtém o usuário associado ao token
+            $user = $personalAccessToken->tokenable;
 
-        if (count($tokenId) !== 2) {
-            return response()->json(['error' => 'Token inválido'], 401);
-        }
+            if (!$user) {
+                return response()->json(['error' => 'Usuário não encontrado'], 401);
+            }
 
-        $userId = $tokenId[0];
+            // Obtém as permissões do token antigo
+            $abilities = $personalAccessToken->abilities;
 
-        // Buscar o usuário
-        $user = User::find($userId);
-
-        if (!$user) {
-            return response()->json(['error' => 'Usuário não encontrado'], 401);
-        }
-
-        // Revogar o token atual
-        $personalAccessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($request->token);
-
-        if ($personalAccessToken) {
+            // Revoga o token antigo
             $personalAccessToken->delete();
-        } else {
-            // Se não encontrar o token diretamente, revogar todos os tokens do usuário
-            $user->tokens()->delete();
+
+            // Cria um novo token com as mesmas permissões
+            $expiresAt = now()->addMinutes(config('sanctum.token_expiration', 5));
+            $token = $user->createToken('api_token', $abilities, $expiresAt);
+
+            return response()->json([
+                'token' => $token->plainTextToken,
+                'expires_at' => $expiresAt->toIso8601String(),
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Erro ao renovar token: ' . $e->getMessage()], 500);
         }
-
-        // Criar um novo token
-        $expiresAt = now()->addMinutes(config('sanctum.token_expiration', 5));
-        $token = $user->createToken('api_token', ['*'], $expiresAt);
-
-        return response()->json([
-            'token' => $token->plainTextToken,
-            'expires_at' => $expiresAt->toIso8601String(),
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-            ],
-        ]);
     }
 }

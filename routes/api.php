@@ -20,7 +20,7 @@ Route::post('/refresh', [ApiAuthController::class, 'refresh']);
 
 // Rotas protegidas por autenticação e domínio
 Route::middleware(['auth:sanctum'])->group(function () {
-    Route::post('/logout', [App\Http\Controllers\Api\AuthController::class, 'logout']);
+    Route::post('/logout', [ApiAuthController::class, 'logout']);
 
     // Servidores Efetivos
     Route::get('/servidores-efetivos', [ApiServidorEfetivoController::class, 'index']);
