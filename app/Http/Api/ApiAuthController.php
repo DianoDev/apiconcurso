@@ -13,41 +13,52 @@ class ApiAuthController extends Controller
 {
     public function login(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-            'device_name' => 'nullable|string',
-        ]);
-
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['As credenciais fornecidas estão incorretas.'],
+        try {
+            $request->validate([
+                'email' => 'required|email',
+                'password' => 'required',
+                'device_name' => 'nullable|string',
             ]);
+
+            $user = User::where('email', $request->email)->first();
+
+            if (!$user || !Hash::check($request->password, $user->password)) {
+                return response()->json([
+                    'message' => 'As credenciais fornecidas estão incorretas.'
+                ], 401);
+            }
+
+            // Define o tempo de expiração do token para 5 minutos
+            $expiresAt = now()->addMinutes(config('sanctum.token_expiration', 5));
+
+            // Revoga tokens anteriores
+            $user->tokens()->delete();
+
+            $token = $user->createToken(
+                $request->device_name ?? $request->email,
+                ['*'],
+                $expiresAt
+            );
+
+            return response()->json([
+                'token' => $token->plainTextToken,
+                'expires_at' => $expiresAt->toIso8601String(),
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ],
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'As credenciais fornecidas estão incorretas.',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro durante o login: ' . $e->getMessage()
+            ], 500);
         }
-
-        // Define o tempo de expiração do token para 5 minutos
-        $expiresAt = now()->addMinutes(config('sanctum.token_expiration', 5));
-
-        // Revoga tokens anteriores
-        $user->tokens()->delete();
-
-        $token = $user->createToken(
-            $request->device_name ?? $request->email,
-            ['*'],
-            $expiresAt
-        );
-
-        return response()->json([
-            'token' => $token->plainTextToken,
-            'expires_at' => $expiresAt->toIso8601String(),
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-            ],
-        ]);
     }
 
     public function logout(Request $request)
