@@ -4,25 +4,49 @@ Este é um sistema backend REST API construído em Laravel para gerenciamento de
 
 ## Requisitos
 
-- PHP 8.2+
-- PostgreSQL 16+
-- Composer
-- Docker (recomendado para ambiente de desenvolvimento)
-- MinIO (para armazenamento de arquivos)
+- Docker
+- Docker Compose
 
-## Configuração
+## Configuração e Instalação
 
 1. Clone o repositório
-2. Execute `composer install`
-3. Configure o arquivo `.env` baseado em `.env.example`
-4. Execute o Docker Compose:
+   ```bash
+   git clone [url-do-repositorio]
+   cd [pasta-do-projeto]
    ```
+
+2. Inicie os containers Docker:
+   ```bash
    docker-compose -f compose-local.yml up -d
    ```
+
+3. Copie o arquivo de configuração:
+   ```bash
+   cp .env.example .env
+   ```
+
+4. Execute o container de composer para instalar as dependências:
+   ```bash
+   docker exec concurso-fpm php artisan key:generate
+   ```
+
 5. Execute as migrações e seeders:
+   ```bash
+   docker exec concurso-fpm php artisan migrate --seed
    ```
-   php artisan migrate --seed
-   ```
+
+6. O sistema estará disponível em `http://localhost:8000` (ou na porta definida em APP_PORT no .env)
+
+## Usuários de Teste
+O seeder cria dois usuários por padrão:
+
+- **Administrador**
+    - Email: admin@example.com
+    - Senha: password
+
+- **Usuário Teste**
+    - Email: teste@example.com
+    - Senha: senha123
 
 ## Autenticação e Segurança
 
@@ -92,6 +116,136 @@ Quando receber a mensagem "token expirado", você deve chamar este mesmo endpoin
 **Endpoint**: `POST /api/logout`
 
 ## Endpoints da API
+
+### Servidores Efetivos
+
+#### Listar todos os servidores efetivos
+**Endpoint**: `GET /api/servidores-efetivos`
+
+**Parâmetros de consulta**:
+- `search`: Termo para filtrar por nome
+- `page`: Página atual para paginação
+
+**Resposta**:
+```json
+{
+  "servidores": {
+    "current_page": 1,
+    "data": [...],
+    "total": 10
+  }
+}
+```
+
+#### Obter um servidor efetivo específico
+**Endpoint**: `GET /api/servidores-efetivos/{id}`
+
+**Resposta**:
+```json
+{
+  "servidor": {
+    "pes_id": 1,
+    "se_matricula": "123456",
+    "pessoa": {
+      "pes_id": 1,
+      "pes_nome": "Nome Completo",
+      "pes_data_nascimento": "1980-01-01",
+      "pes_sexo": "M",
+      "pes_mae": "Nome da Mãe",
+      "pes_pai": "Nome do Pai",
+      "fotos": [...],
+      "lotacoes": [...]
+    }
+  }
+}
+```
+
+#### Criar um servidor efetivo
+**Endpoint**: `POST /api/servidores-efetivos`
+
+**Body**:
+```json
+{
+  "pes_nome": "Nome Completo",
+  "pes_data_nascimento": "1980-01-01",
+  "pes_sexo": "M",
+  "pes_mae": "Nome da Mãe",
+  "pes_pai": "Nome do Pai",
+  "se_matricula": "123456",
+  "unid_id": 1
+}
+```
+
+**Resposta**:
+```json
+{
+  "message": "Servidor efetivo cadastrado com sucesso",
+  "servidor": {...}
+}
+```
+
+#### Atualizar um servidor efetivo
+**Endpoint**: `PUT /api/servidores-efetivos/{id}`
+
+**Body**: (mesmo formato da criação)
+
+**Resposta**:
+```json
+{
+  "message": "Servidor efetivo atualizado com sucesso",
+  "servidor": {...}
+}
+```
+
+#### Excluir um servidor efetivo
+**Endpoint**: `DELETE /api/servidores-efetivos/{id}`
+
+**Resposta**:
+```json
+{
+  "message": "Servidor efetivo excluído com sucesso"
+}
+```
+
+#### Consultar servidores por unidade
+**Endpoint**: `GET /api/servidores-efetivos/unidade/{unidadeId}`
+
+**Resposta**:
+```json
+[
+  {
+    "nome": "Nome Completo",
+    "idade": 43,
+    "unidade_lotacao": "Nome da Unidade",
+    "fotografia": "url_temporaria"
+  },
+  ...
+]
+```
+
+#### Buscar servidores por nome
+**Endpoint**: `POST /api/servidores-efetivos/buscar-por-nome`
+
+**Body**:
+```json
+{
+  "nome": "termo_de_busca"
+}
+```
+
+**Resposta**:
+```json
+[
+  {
+    "id": 1,
+    "nome": "Nome Completo",
+    "idade": 43,
+    "unidade_lotacao": "Nome da Unidade",
+    "endereco_funcional": "Endereço completo"
+  },
+  ...
+]
+```
 
 ### Servidores Temporários
 
@@ -192,16 +346,31 @@ Quando receber a mensagem "token expirado", você deve chamar este mesmo endpoin
 #### Listar todas as unidades
 **Endpoint**: `GET /api/unidades`
 
+**Parâmetros de consulta**:
+- `search`: Termo para filtrar por nome ou sigla
+- `page`: Página atual para paginação
+
 **Resposta**:
 ```json
 {
-  "message": "Unidades listadas com sucesso",
-  "unidades": {...}
+  "current_page": 1,
+  "data": [...],
+  "total": 10
 }
 ```
 
 #### Obter uma unidade específica
 **Endpoint**: `GET /api/unidades/{id}`
+
+**Resposta**:
+```json
+{
+  "unid_id": 1,
+  "unid_nome": "Nome da Unidade",
+  "unid_sigla": "SIGLA",
+  "enderecos": [...]
+}
+```
 
 #### Criar uma unidade
 **Endpoint**: `POST /api/unidades`
@@ -219,19 +388,71 @@ Quando receber a mensagem "token expirado", você deve chamar este mesmo endpoin
 }
 ```
 
+**Resposta**:
+```json
+{
+  "message": "Unidade cadastrada com sucesso",
+  "unidade": {...}
+}
+```
+
 #### Atualizar uma unidade
 **Endpoint**: `PUT /api/unidades/{id}`
 
+**Body**: (mesmo formato da criação)
+
+**Resposta**:
+```json
+{
+  "message": "Unidade atualizada com sucesso",
+  "unidade": {...}
+}
+```
+
 #### Excluir uma unidade
 **Endpoint**: `DELETE /api/unidades/{id}`
+
+**Resposta**:
+```json
+{
+  "message": "Unidade excluída com sucesso"
+}
+```
 
 ### Lotações
 
 #### Listar todas as lotações
 **Endpoint**: `GET /api/lotacoes`
 
+**Parâmetros de consulta**:
+- `search`: Termo para filtrar por nome da pessoa ou unidade
+- `page`: Página atual para paginação
+
+**Resposta**:
+```json
+{
+  "current_page": 1,
+  "data": [...],
+  "total": 10
+}
+```
+
 #### Obter uma lotação específica
 **Endpoint**: `GET /api/lotacoes/{id}`
+
+**Resposta**:
+```json
+{
+  "lot_id": 1,
+  "pes_id": 1,
+  "unid_id": 1,
+  "lot_data_lotacao": "2023-01-01",
+  "lot_data_remocao": null,
+  "lot_portaria": "Portaria nº 123/2023",
+  "pessoa": {...},
+  "unidade": {...}
+}
+```
 
 #### Criar uma lotação
 **Endpoint**: `POST /api/lotacoes`
@@ -247,11 +468,36 @@ Quando receber a mensagem "token expirado", você deve chamar este mesmo endpoin
 }
 ```
 
+**Resposta**:
+```json
+{
+  "message": "Lotação cadastrada com sucesso",
+  "lotacao": {...}
+}
+```
+
 #### Atualizar uma lotação
 **Endpoint**: `PUT /api/lotacoes/{id}`
 
+**Body**: (mesmo formato da criação)
+
+**Resposta**:
+```json
+{
+  "message": "Lotação atualizada com sucesso",
+  "lotacao": {...}
+}
+```
+
 #### Excluir uma lotação
 **Endpoint**: `DELETE /api/lotacoes/{id}`
+
+**Resposta**:
+```json
+{
+  "message": "Lotação excluída com sucesso"
+}
+```
 
 ### Upload de Fotos
 
@@ -266,18 +512,18 @@ Quando receber a mensagem "token expirado", você deve chamar este mesmo endpoin
 **Requisição para um único arquivo**:
 - Método: `POST`
 - Headers:
-  - `Authorization: Bearer {seu_token}`
-  - `Content-Type: multipart/form-data`
+    - `Authorization: Bearer {seu_token}`
+    - `Content-Type: multipart/form-data`
 - Body (form-data):
-  - `file`: arquivo da imagem (JPG, PNG, GIF)
+    - `file`: arquivo da imagem (JPG, PNG, GIF)
 
 **Requisição para múltiplos arquivos**:
 - Método: `POST`
 - Headers:
-  - `Authorization: Bearer {seu_token}`
-  - `Content-Type: multipart/form-data`
+    - `Authorization: Bearer {seu_token}`
+    - `Content-Type: multipart/form-data`
 - Body (form-data):
-  - `files`: múltiplos arquivos de imagem (JPG, PNG, GIF)
+    - `files`: múltiplos arquivos de imagem (JPG, PNG, GIF)
 
 **Resposta para um único arquivo**:
 ```json
@@ -356,4 +602,22 @@ Quando receber a mensagem "token expirado", você deve chamar este mesmo endpoin
 }
 ```
 
+## Resolvendo Problemas Comuns
 
+### Serviços não iniciam corretamente
+Se algum serviço não iniciar corretamente, tente:
+```bash
+docker-compose -f compose-local.yml down
+docker-compose -f compose-local.yml up -d
+```
+
+### Erro no MinIO
+Certifique-se de que as configurações de MinIO no arquivo .env estão corretas.
+O bucket será criado automaticamente na primeira execução.
+
+### Permissões de Arquivos
+Se encontrar problemas de permissão:
+```bash
+docker exec concurso-fpm chmod -R 777 storage
+docker exec concurso-fpm chmod -R 777 bootstrap/cache
+```
