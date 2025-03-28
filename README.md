@@ -11,8 +11,8 @@ Este é um sistema backend REST API construído em Laravel para gerenciamento de
 
 1. Clone o repositório
    ```bash
-   git clone [url-do-repositorio]
-   cd [pasta-do-projeto]
+   git https://github.com/DianoDev/apiconcurso
+   cd apiconcurso
    ```
 
 2. Inicie os containers Docker:
