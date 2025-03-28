@@ -78,7 +78,6 @@ class ApiLotacaoController extends Controller
     public function update(Request $request, $id)
     {
         $lotacao = Lotacao::findOrFail($id);
-        \Illuminate\Support\Facades\Log::info('update lotacao');
         $validated = $request->validate([
             'pes_id' => 'required|exists:pessoa,pes_id',
             'unid_id' => 'required|exists:unidade,unid_id',
@@ -86,7 +85,6 @@ class ApiLotacaoController extends Controller
             'lot_data_remocao' => 'nullable|date|after:lot_data_lotacao',
             'lot_portaria' => 'nullable|string|max:100',
         ]);
-        \Illuminate\Support\Facades\Log::info('update lotacao validado');
         try {
             $lotacao->update([
                 'pes_id' => $validated['pes_id'],
@@ -95,7 +93,6 @@ class ApiLotacaoController extends Controller
                 'lot_data_remocao' => $validated['lot_data_remocao'] ?? null,
                 'lot_portaria' => $validated['lot_portaria'] ?? null,
             ]);
-            \Illuminate\Support\Facades\Log::info('update lotacao updatado');
             return response()->json([
                 'message' => 'Lotação atualizada com sucesso',
                 'lotacao' => $lotacao->load(['pessoa', 'unidade']),
@@ -110,7 +107,6 @@ class ApiLotacaoController extends Controller
         try {
             $lotacao = Lotacao::findOrFail($id);
             $lotacao->delete();
-
             return response()->json(['message' => 'Lotação excluída com sucesso']);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Erro ao excluir lotação: ' . $e->getMessage()], 500);

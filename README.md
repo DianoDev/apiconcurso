@@ -1,66 +1,359 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Sistema de Gestão de Servidores
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Este é um sistema backend REST API construído em Laravel para gerenciamento de servidores públicos, incluindo servidores efetivos e temporários, com recursos de gestão de unidades, lotações e documentação fotográfica.
 
-## About Laravel
+## Requisitos
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- PHP 8.2+
+- PostgreSQL 16+
+- Composer
+- Docker (recomendado para ambiente de desenvolvimento)
+- MinIO (para armazenamento de arquivos)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Configuração
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+1. Clone o repositório
+2. Execute `composer install`
+3. Configure o arquivo `.env` baseado em `.env.example`
+4. Execute o Docker Compose:
+   ```
+   docker-compose -f compose-local.yml up -d
+   ```
+5. Execute as migrações e seeders:
+   ```
+   php artisan migrate --seed
+   ```
 
-## Learning Laravel
+## Autenticação e Segurança
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### Login
+O sistema utiliza tokens JWT com expiração em 5 minutos.
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+**Endpoint**: `POST /api/login`
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+**Body**:
+```json
+{
+  "email": "seu_email@exemplo.com",
+  "password": "sua_senha",
+  "device_name": "dispositivo_opcional"
+}
+```
 
-## Laravel Sponsors
+**Resposta**:
+```json
+{
+  "token": "seu_token_jwt",
+  "expires_at": "2025-03-28T10:30:00Z",
+  "user": {
+    "id": 1,
+    "name": "Nome do Usuário",
+    "email": "seu_email@exemplo.com"
+  }
+}
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### Refresh Token
 
-### Premium Partners
+Para renovar o token antes ou após a expiração (5 minutos), utilize:
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+**Endpoint**: `POST /api/refresh`
 
-## Contributing
+**Body**:
+```json
+{
+  "token": "seu_token_atual"
+}
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+**Resposta em caso de sucesso**:
+```json
+{
+  "token": "novo_token_jwt",
+  "expires_at": "2025-03-28T10:35:00Z",
+  "user": {
+    "id": 1,
+    "name": "Nome do Usuário",
+    "email": "seu_email@exemplo.com"
+  }
+}
+```
 
-## Code of Conduct
+**Resposta em caso de token expirado**:
+```json
+{
+  "message": "token expirado"
+}
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Quando receber a mensagem "token expirado", você deve chamar este mesmo endpoint (/api/refresh) para obter um novo token.
 
-## Security Vulnerabilities
+### Logout
+**Endpoint**: `POST /api/logout`
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Endpoints da API
 
-## License
+### Servidores Temporários
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+#### Listar todos os servidores temporários
+**Endpoint**: `GET /api/servidores-temporarios`
+
+**Parâmetros de consulta**:
+- `search`: Termo para filtrar por nome
+- `page`: Página atual para paginação
+
+**Resposta**:
+```json
+{
+  "message": "Servidores temporários listados com sucesso",
+  "servidores": {
+    "current_page": 1,
+    "data": [...],
+    "total": 10
+  }
+}
+```
+
+#### Obter um servidor temporário específico
+**Endpoint**: `GET /api/servidores-temporarios/{id}`
+
+**Resposta**:
+```json
+{
+  "message": "Servidor temporário encontrado",
+  "servidor": {
+    "pes_id": 1,
+    "st_data_admissao": "2023-01-01",
+    "st_data_demissao": "2023-12-31",
+    "pessoa": {
+      "pes_id": 1,
+      "pes_nome": "Nome Completo",
+      "pes_data_nascimento": "1990-01-01",
+      "pes_sexo": "M",
+      "pes_mae": "Nome da Mãe",
+      "pes_pai": "Nome do Pai",
+      "fotos": [...],
+      "lotacoes": [...]
+    }
+  }
+}
+```
+
+#### Criar um servidor temporário
+**Endpoint**: `POST /api/servidores-temporarios`
+
+**Body**:
+```json
+{
+  "pes_nome": "Nome Completo",
+  "pes_data_nascimento": "1990-01-01",
+  "pes_sexo": "M",
+  "pes_mae": "Nome da Mãe",
+  "pes_pai": "Nome do Pai",
+  "st_data_admissao": "2023-01-01",
+  "st_data_demissao": "2023-12-31",
+  "unid_id": 1
+}
+```
+
+**Resposta**:
+```json
+{
+  "message": "Servidor temporário cadastrado com sucesso",
+  "servidor": {...}
+}
+```
+
+#### Atualizar um servidor temporário
+**Endpoint**: `PUT /api/servidores-temporarios/{id}`
+
+**Body**: (mesmo formato da criação)
+
+**Resposta**:
+```json
+{
+  "message": "Servidor temporário atualizado com sucesso",
+  "servidor": {...}
+}
+```
+
+#### Excluir um servidor temporário
+**Endpoint**: `DELETE /api/servidores-temporarios/{id}`
+
+**Resposta**:
+```json
+{
+  "message": "Servidor temporário excluído com sucesso"
+}
+```
+
+### Unidades
+
+#### Listar todas as unidades
+**Endpoint**: `GET /api/unidades`
+
+**Resposta**:
+```json
+{
+  "message": "Unidades listadas com sucesso",
+  "unidades": {...}
+}
+```
+
+#### Obter uma unidade específica
+**Endpoint**: `GET /api/unidades/{id}`
+
+#### Criar uma unidade
+**Endpoint**: `POST /api/unidades`
+
+**Body**:
+```json
+{
+  "unid_nome": "Nome da Unidade",
+  "unid_sigla": "SIGLA",
+  "end_tipo_logradouro": "Avenida",
+  "end_logradouro": "Nome da Rua",
+  "end_numero": 123,
+  "end_bairro": "Nome do Bairro",
+  "cid_id": 1
+}
+```
+
+#### Atualizar uma unidade
+**Endpoint**: `PUT /api/unidades/{id}`
+
+#### Excluir uma unidade
+**Endpoint**: `DELETE /api/unidades/{id}`
+
+### Lotações
+
+#### Listar todas as lotações
+**Endpoint**: `GET /api/lotacoes`
+
+#### Obter uma lotação específica
+**Endpoint**: `GET /api/lotacoes/{id}`
+
+#### Criar uma lotação
+**Endpoint**: `POST /api/lotacoes`
+
+**Body**:
+```json
+{
+  "pes_id": 1,
+  "unid_id": 1,
+  "lot_data_lotacao": "2023-01-01",
+  "lot_data_remocao": null,
+  "lot_portaria": "Portaria nº 123/2023"
+}
+```
+
+#### Atualizar uma lotação
+**Endpoint**: `PUT /api/lotacoes/{id}`
+
+#### Excluir uma lotação
+**Endpoint**: `DELETE /api/lotacoes/{id}`
+
+### Upload de Fotos
+
+#### Upload de Fotos de Pessoa
+
+**IMPORTANTE**: Existem dois modos de upload:
+1. **Upload de arquivo único**: Use o campo `file`
+2. **Upload de múltiplos arquivos**: Use o campo `files` (observe que não é "files[]")
+
+**Endpoint**: `POST /api/pessoas/{pessoaId}/fotos`
+
+**Requisição para um único arquivo**:
+- Método: `POST`
+- Headers:
+  - `Authorization: Bearer {seu_token}`
+  - `Content-Type: multipart/form-data`
+- Body (form-data):
+  - `file`: arquivo da imagem (JPG, PNG, GIF)
+
+**Requisição para múltiplos arquivos**:
+- Método: `POST`
+- Headers:
+  - `Authorization: Bearer {seu_token}`
+  - `Content-Type: multipart/form-data`
+- Body (form-data):
+  - `files`: múltiplos arquivos de imagem (JPG, PNG, GIF)
+
+**Resposta para um único arquivo**:
+```json
+{
+  "message": "Foto cadastrada com sucesso",
+  "foto": {
+    "id": 1,
+    "data": "2025-03-28",
+    "url": "url_temporaria_com_validade_de_5_minutos"
+  }
+}
+```
+
+**Resposta para múltiplos arquivos**:
+```json
+{
+  "message": "3 foto(s) cadastrada(s) com sucesso",
+  "fotos": [
+    {
+      "id": 1,
+      "data": "2025-03-28",
+      "url": "url_temporaria_com_validade_de_5_minutos"
+    },
+    {
+      "id": 2,
+      "data": "2025-03-28",
+      "url": "url_temporaria_com_validade_de_5_minutos"
+    },
+    {
+      "id": 3,
+      "data": "2025-03-28",
+      "url": "url_temporaria_com_validade_de_5_minutos"
+    }
+  ]
+}
+```
+
+#### Visualizar Foto
+**Endpoint**: `GET /api/fotos/{id}`
+
+**Resposta**:
+```json
+{
+  "id": 1,
+  "data": "2025-03-28",
+  "url": "url_temporaria_com_validade_de_5_minutos"
+}
+```
+
+#### Listar Fotos de uma Pessoa
+**Endpoint**: `GET /api/pessoas/{pessoaId}/fotos`
+
+**Resposta**:
+```json
+[
+  {
+    "id": 1,
+    "data": "2025-03-28",
+    "url": "url_temporaria_com_validade_de_5_minutos"
+  },
+  {
+    "id": 2,
+    "data": "2025-03-28",
+    "url": "url_temporaria_com_validade_de_5_minutos"
+  }
+]
+```
+
+#### Excluir Foto
+**Endpoint**: `DELETE /api/fotos/{id}`
+
+**Resposta**:
+```json
+{
+  "message": "Foto excluída com sucesso"
+}
+```
+
+
